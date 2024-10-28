@@ -1,0 +1,256 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class StoriesWidget extends StatefulWidget {
+  const StoriesWidget({
+    super.key,
+    this.width,
+    this.height,
+    required this.userId,
+  });
+
+  final double? width;
+  final double? height;
+  final String userId;
+
+  @override
+  State<StoriesWidget> createState() => _StoriesWidgetState();
+}
+
+class _StoriesWidgetState extends State<StoriesWidget> {
+  late Future<List<Story>> _userStories;
+
+  @override
+  void initState() {
+    super.initState();
+    _userStories = fetchUserStories(widget.userId);
+  }
+
+  Future<List<Story>> fetchUserStories(String userId) async {
+    final response = await Supabase.instance.client
+        .from('user_stories')
+        .select()
+        .eq('user_id', userId)
+        .execute();
+
+    final stories = (response.data as List)
+        .map((story) => Story.fromMap(story))
+        .toList();
+
+    // Fetch video duration for each story asynchronously
+    for (var story in stories) {
+      await story.fetchVideoDuration();
+    }
+
+    return stories;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Story>>(
+      future: _userStories,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(child: Text('No stories available.'));
+        }
+
+        return StoryDisplayWidget(stories: snapshot.data!);
+      },
+    );
+  }
+}
+
+class StoryDisplayWidget extends StatefulWidget {
+  final List<Story> stories;
+
+  const StoryDisplayWidget({Key? key, required this.stories}) : super(key: key);
+
+  @override
+  _StoryDisplayWidgetState createState() => _StoryDisplayWidgetState();
+}
+
+class _StoryDisplayWidgetState extends State<StoryDisplayWidget> {
+  late PageController _pageController;
+  int _currentIndex = 0;
+  double _progressValue = 0.0;
+  Timer? _progressTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    startStoryProgress();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _progressTimer?.cancel();
+    super.dispose();
+  }
+
+  void startStoryProgress() {
+    Duration storyDuration = widget.stories[_currentIndex].isVideo
+        ? widget.stories[_currentIndex].videoDuration
+        : Duration(seconds: 7);
+
+    _progressTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      setState(() {
+        _progressValue += 0.1 / (storyDuration.inMilliseconds / 100);
+        if (_progressValue >= 1.0) {
+          _progressValue = 1.0;
+          timer.cancel();
+
+          if (_currentIndex < widget.stories.length - 1) {
+            _currentIndex++;
+            _progressValue = 0.0;
+            _pageController.jumpToPage(_currentIndex);
+            startStoryProgress();
+          } else {
+            _currentIndex = 0; // Restart from the first story
+            _progressValue = 0.0;
+            _pageController.jumpToPage(_currentIndex);
+            startStoryProgress();
+          }
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          itemCount: widget.stories.length,
+          itemBuilder: (context, index) {
+            return StoryContentWidget(
+              story: widget.stories[index],
+              isCurrentStory: index == _currentIndex,
+            );
+          },
+          onPageChanged: (index) {
+            setState(() {
+              _currentIndex = index;
+              _progressValue = 0.0;
+              _progressTimer?.cancel();
+              startStoryProgress();
+            });
+          },
+        ),
+        Positioned(
+          top: 10,
+          left: 10,
+          right: 10,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(widget.stories.length, (index) {
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: LinearProgressIndicator(
+                    value: index == _currentIndex
+                        ? _progressValue
+                        : (index < _currentIndex ? 1.0 : 0.0),
+                    backgroundColor: Colors.grey[300],
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class StoryContentWidget extends StatefulWidget {
+  final Story story;
+  final bool isCurrentStory;
+
+  const StoryContentWidget({
+    Key? key,
+    required this.story,
+    required this.isCurrentStory,
+  }) : super(key: key);
+
+  @override
+  _StoryContentWidgetState createState() => _StoryContentWidgetState();
+}
+
+class _StoryContentWidgetState extends State<StoryContentWidget> {
+  late VideoPlayerController _controller;
+  bool _isVideoInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.story.isVideo) {
+      _controller = VideoPlayerController.network(widget.story.mediaUrl)
+        ..initialize().then((_) {
+          setState(() {
+            _isVideoInitialized = true;
+            _controller.play();
+          });
+        });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.story.isVideo) {
+      _controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.story.isVideo
+        ? (_isVideoInitialized
+            ? AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              )
+            : Center(child: CircularProgressIndicator()))
+        : Image.network(widget.story.mediaUrl, fit: BoxFit.cover);
+  }
+}
+
+class Story {
+  final String mediaUrl;
+  Duration videoDuration;
+
+  Story({
+    required this.mediaUrl,
+    required this.videoDuration,
+  });
+
+  factory Story.fromMap(Map<String, dynamic> map) {
+    return Story(
+      mediaUrl: map['media_url'],
+      videoDuration: Duration(seconds: 0), // Placeholder for initial value
+    );
+  }
+
+  bool get isVideo => mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.mov');
+
+  Future<void> fetchVideoDuration() async {
+    if (isVideo) {
+      final controller = VideoPlayerController.network(mediaUrl);
+      await controller.initialize();
+      videoDuration = controller.value.duration;
+      controller.dispose(); // Dispose the controller after fetching duration
+    } else {
+      videoDuration = Duration(seconds: 7); // Default duration for images
+    }
+  }
+}
