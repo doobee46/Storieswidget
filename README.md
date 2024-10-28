@@ -34,64 +34,125 @@ These instructions will guide you on setting up the project locally on your mach
    ```bash
    git clone https://github.com/your-username/StoriesWidget.git
    cd Install dependencies:
+# Flutter Stories Widget
 
-bash
-Copy code
-flutter pub get
-Add Supabase Credentials:
+A customizable Stories widget for Flutter applications with Supabase integration, supporting both images and videos.
 
-In lib/supabase_config.dart or wherever your Supabase configuration file is located:
-dart
-Copy code
+## Installation
+
+1. Add the dependency to your `pubspec.yaml`:
+   ```yaml
+   dependencies:
+     flutter_stories_widget: ^1.0.0  # Replace with actual version
+   ```
+
+2. Install dependencies:
+   ```bash
+   flutter pub get
+   ```
+
+## Configuration
+
+### Supabase Setup
+
+Create a configuration file at `lib/supabase_config.dart`:
+
+```dart
 const String SUPABASE_URL = 'your-supabase-url';
 const String SUPABASE_KEY = 'your-supabase-key';
-Usage
-Include the StoriesWidget in your app:
+```
 
-dart
-Copy code
+## Usage
+
+### Basic Implementation
+
+```dart
 import 'package:your_package_name/widgets/stories_widget.dart';
 
+// In your widget build method:
 StoriesWidget(
-  userId: 'user_id_here', // replace with dynamic user ID as needed
+  userId: 'user_id_here',  // Replace with dynamic user ID
   width: MediaQuery.of(context).size.width,
   height: MediaQuery.of(context).size.height * 0.8,
 )
-Stories Structure:
+```
 
-Video: Automatically plays for the video’s duration.
-Image: Displays for 7 seconds (modifiable in code).
-Code Structure
-Story Class: Defines the structure for each story and fetches video durations automatically.
+## Features
 
-StoryDisplayWidget: Manages story progress, swiping, and looping functionality.
+### Content Types
+- **Videos**: Auto-play with natural duration
+- **Images**: Display with configurable duration (default: 7 seconds)
 
-StoryContentWidget: Displays the individual stories, rendering either an image or video widget based on the media type.
+### Components
 
-Progress Indicator: A dynamic progress indicator located at the top reflects the current story’s playtime and progresses based on video duration or image timeout.
+1. **Story Class**
+   - Defines story structure
+   - Handles automatic video duration fetching
+   - Manages media type detection
 
-Configurations
-To customize the image duration, modify the Duration for images in _StoryDisplayWidgetState.startStoryProgress(), e.g.:
+2. **StoryDisplayWidget**
+   - Core functionality for story navigation
+   - Handles swipe gestures
+   - Manages story progression
+   - Controls story looping
 
-dart
-Copy code
-final Duration imageDuration = Duration(seconds: 7);
-Troubleshooting
-Video Progress Misalignment: Ensure the video duration is correctly fetched. If issues persist, verify the connection to Supabase and that videos are accessible via URLs.
-Supabase API Errors: Double-check API URL and keys in your Supabase configuration file.
-Contributions
-Contributions are welcome! Feel free to open issues or submit pull requests with improvements.
+3. **StoryContentWidget**
+   - Renders media content
+   - Supports both image and video formats
+   - Handles media loading states
 
-License
-This project is licensed under the MIT License.
+4. **Progress Indicator**
+   - Shows story progress at top of screen
+   - Dynamically updates based on content type
+   - Supports pause/resume functionality
 
-arduino
-Copy code
+## Customization
 
-Feel free to adjust URLs, paths, or any other configuration specifics to fit your project setup!
+### Modifying Image Duration
+
+To change the default image display duration, locate `_StoryDisplayWidgetState.startStoryProgress()` and modify:
+
+```dart
+final Duration imageDuration = Duration(seconds: 7);  // Adjust as needed
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Video Progress Issues**
+   - Verify video duration fetching
+   - Check Supabase connection
+   - Ensure video URLs are accessible
+
+2. **Supabase API Errors**
+   - Verify API URL and key configuration
+   - Check network connectivity
+   - Validate Supabase permissions
+
+### Debug Tips
+- Enable debug logging for detailed error tracking
+- Verify media URLs in Supabase storage
+- Check network requests in debug console
+
+## Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+For bug reports or feature requests, please open an issue in the repository.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+---
+
+**Note**: Remember to replace placeholder values (`your-supabase-url`, `your-supabase-key`, etc.) with your actual project configuration.
 
 
 
 
-
-StoriesWidget
